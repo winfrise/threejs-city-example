@@ -6,6 +6,10 @@
 
 <script>
 import ThreejsClass from './ThreejsClass'
+import baseEventsPlugin from './plugins/baseEventsPlugin'
+import winResizePlugin from './plugins/winResizePlugin'
+ThreejsClass.use(baseEventsPlugin)
+ThreejsClass.use(winResizePlugin)
 export default {
   name: 'CityExample',
   data () {

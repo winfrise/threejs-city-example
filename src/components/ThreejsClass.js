@@ -1,30 +1,51 @@
 import * as THREE from 'three'
-import { CSS2DRenderer, CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer";
+import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader";
-import makeCycleTextSprite from './utils/makeCycleTextSprite'
 import Animations from './utils/animations'
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import Stats from "three/examples/jsm/libs/stats.module";
 import { TWEEN } from "three/examples/jsm/libs/tween.module.min.js";
 
 export default class ThreejsClass {
-  constructor (options) {
+  constructor(options) {
     this._options = options
     this.scene = null;
     this.renderer = null;
+    this.camera = null
     this.labelRenderer = null;
     this.city = null;
-    this.billboardLabel = null;
     this.cityGroup = new THREE.Group;
-    this.interactablePoints = [
-      { key: '1', value: '摩天大楼', location: { x: -2, y: 5, z: 0 } }
-    ];
-    this.interactableMeshes = []
+
+    this._events = []
+    this._installedPlugins = [] // 挂载的插件列表
+
+    this._installPlugins()
 
     this._init()
     this._animate()
   }
-  _init () {
+  _installPlugins() {
+    const plugins = ThreejsClass._installedPlugins
+    plugins.forEach(plugin => {
+      console.log('t', this)
+      plugin.call(this, this)
+    })
+  }
+  static use(plugin) {
+    const installedPlugins = (this._installedPlugins || (this._installedPlugins = []))
+    if (installedPlugins.indexOf(plugin) > -1) {
+      return this
+    }
+    installedPlugins.push(plugin)
+    return this
+  }
+  _init() {
+    // 场景
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x582424);
+    this.scene.fog = new THREE.Fog(0xeeeeee, 0, 100);
+
+    // WebGLRenderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,22 +56,17 @@ export default class ThreejsClass {
 
     // 添加2d渲染图层
     this.labelRenderer = new CSS2DRenderer();
-    this.labelRenderer.setSize( window.innerWidth, window.innerHeight );
+    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
     this.labelRenderer.domElement.style.position = 'absolute';
     this.labelRenderer.domElement.style.top = '0px';
     this.labelRenderer.domElement.style.pointerEvents = 'none';
     document.body.appendChild(this.labelRenderer.domElement);
-  
-    // 场景
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x582424);
-    this.scene.fog = new THREE.Fog(0xeeeeee, 0, 100);
 
     // 透视相机：视场、长宽比、近面、远面
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(120, 100, 100);
     this.camera.lookAt(new THREE.Vector3(0, 0, 0));
-  
+
     // threejs中采用的是右手坐标系，红线是X轴，绿线是Y轴，蓝线是Z轴
     // const axes = new THREE.AxisHelper(30);
     // scene.add(axes);
@@ -71,23 +87,36 @@ export default class ThreejsClass {
     this.directionLight.shadow.camera.left = - 70;
     this.directionLight.shadow.camera.right = 80;
     this.scene.add(this.directionLight);
-  
+
     // const lightHelper = new THREE.DirectionalLightHelper(directionLight, 1, 'red');
     // scene.add(lightHelper);
     // const lightCameraHelper = new THREE.CameraHelper(directionLight.shadow.camera);
     // scene.add(lightCameraHelper);
-  
+
     // 环境光
     this.ambientLight = new THREE.AmbientLight(0x605a64);
     this.scene.add(this.ambientLight);
-  
-      // 网格
-      // var grid = new THREE.GridHelper(50, 100, 0x000000, 0x000000);
-      // grid.position.set(0, 0, 0)
-      // grid.material.opacity = 0.2;
-      // grid.material.transparent = true;
-      // scene.add(grid);
-  
+
+    // 网格
+    // var grid = new THREE.GridHelper(50, 100, 0x000000, 0x000000);
+    // grid.position.set(0, 0, 0)
+    // grid.material.opacity = 0.2;
+    // grid.material.transparent = true;
+    // scene.add(grid);
+
+
+
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.target.set(0, 0, 0);
+    this.controls.enableDamping = true;
+
+
+    const stats = new Stats();
+    document.documentElement.appendChild(stats.dom);
+    this._loadModel()
+    this.emit('loaded')
+  }
+  _loadModel() {
     // 加载模型
     var loader = new FBXLoader();
     loader.load(this._options.cityModel, mesh => {
@@ -120,22 +149,14 @@ export default class ThreejsClass {
 
       this.city = mesh;
       this.cityGroup.add(mesh);
-      // 添加交互点
-      this.interactablePoints.map(item => {
-        let point = makeCycleTextSprite(item.key);
-        point.name = item.value;
-        point.scale.set(1, 1, 1);
-        point.position.set(item.location.x, item.location.y, item.location.z);
-        this.cityGroup.add(point);
-        this.interactableMeshes.push(point);
-      })
+      this.emit('modelLoaded')
       this.scene.add(this.cityGroup);
     }, res => {
       if (Number((res.loaded / res.total * 100).toFixed(0)) === 100) {
         Animations.animateCamera(
-          this.camera, 
-          this.controls, 
-          { x: 0, y: 10, z: 20 }, { x: 0, y: 0, z: 0 }, 4000, () => {}
+          this.camera,
+          this.controls,
+          { x: 0, y: 10, z: 20 }, { x: 0, y: 0, z: 0 }, 4000, () => { }
         );
       }
       // TODO:加载状态
@@ -143,23 +164,8 @@ export default class ThreejsClass {
     }, err => {
       console.log(err);
     });
-  
-      this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-      this.controls.target.set(0, 0, 0);
-      this.controls.enableDamping = true;
-      window.addEventListener('resize', this._onWindowResize.bind(this), false);
-  
-      const stats = new Stats();
-      document.documentElement.appendChild(stats.dom);
-
   }
-  _onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
-  }
-  _animate () {
+  _animate() {
     requestAnimationFrame(this._animate.bind(this));
     this.renderer.render(this.scene, this.camera);
     this.labelRenderer.render(this.scene, this.camera);
@@ -167,54 +173,12 @@ export default class ThreejsClass {
     TWEEN && TWEEN.update();
     this.controls && this.controls.update();
   }
-  _bindEvents () {
-    // 增加点击事件，声明raycaster和mouse变量
-    var raycaster = new THREE.Raycaster();
-    var mouse = new THREE.Vector2();
-    function handleMouseClick(event) {
-      console.log(event)
-      // 通过鼠标点击的位置计算出raycaster所需要的点的位置，以屏幕中心为原点，值的范围为-1到1.
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-      // 通过鼠标点的位置和当前相机的矩阵计算出raycaster
-      raycaster.setFromCamera(mouse, this.camera);
-      // 获取raycaster直线和所有模型相交的数组集合
-      var intersects = raycaster.intersectObjects(this.interactableMeshes);
-      if (intersects.length > 0) {
-        console.log(intersects[0].object)
-        let mesh = intersects[0].object
-        Animations.animateCamera(this.camera, this.controls, { x: mesh.position.x, y: mesh.position.y + 4, z: mesh.position.z + 12 }, { x: 0, y: 0, z: 0 }, 1200, () => {
-          let billboardDiv = document.createElement('div');
-          billboardDiv.className = 'billboard';
-          billboardDiv.textContent = mesh.name;
-          billboardDiv.style.marginTop = '1em';
-          let billboardLabel = new CSS2DObject(billboardDiv);
-          billboardLabel.position.set(0, 0, 0);
-          this.billboardLabel = billboardLabel;
-          mesh.add(billboardLabel);
-        });
-      } else {
-        this.interactableMeshes.map(item => {
-          item.remove(this.billboardLabel);
-        })
-      }
-    }
-    function handleMouseEnter(event) {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, this.camera);
-      var intersects = raycaster.intersectObjects(this.interactableMeshes, true);
-      if (intersects.length > 0) {
-        let mesh = intersects[0].object
-        mesh.material.color = new THREE.Color(0x03c03c)
-      } else {
-        this.interactableMeshes.map(item => {
-          item.material.color = new THREE.Color(0xffffff);
-        })
-      }
-    }
-    this.renderer.domElement.style.touchAction = 'none';
-    this.renderer.domElement.addEventListener('click', handleMouseClick, false);
-    this.renderer.domElement.addEventListener('pointermove', handleMouseEnter, false);
+  on(type, handler) {
+    const events = (this._events[type] || (this._events[type] = []))
+    events.push(handler)
+  }
+  emit(type, ...args) {
+    const events = this._events[type] || []
+    events.forEach(fn => fn(...args))
   }
 }

@@ -24,13 +24,14 @@ export default class ThreejsClass {
     this._init()
     this._animate()
   }
+  
   _installPlugins() {
     const plugins = ThreejsClass._installedPlugins
     plugins.forEach(plugin => {
-      console.log('t', this)
       plugin.call(this, this)
     })
   }
+  // 添加插件的方法
   static use(plugin) {
     const installedPlugins = (this._installedPlugins || (this._installedPlugins = []))
     if (installedPlugins.indexOf(plugin) > -1) {

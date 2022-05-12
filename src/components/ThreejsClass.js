@@ -5,7 +5,6 @@ import Animations from './utils/animations'
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import Stats from "three/examples/jsm/libs/stats.module";
 import { TWEEN } from "three/examples/jsm/libs/tween.module.min.js";
-
 export default class ThreejsClass {
   constructor(options) {
     this._options = options
@@ -119,8 +118,15 @@ export default class ThreejsClass {
   }
   _loadModel() {
     // 加载模型
-    var loader = new FBXLoader();
-    loader.load(this._options.cityModel, mesh => {
+    const mapFile = this._options.cityModel
+    var loader 
+    if (mapFile.endsWith('.fbx')) {
+      loader = new FBXLoader();
+    } else {
+      loader = new THREE.ObjectLoader()
+    }
+
+    loader.load(mapFile, mesh => {
       /* eslint-disable */
       mesh.traverse(function (child) {
         // if (child.isMesh) {
@@ -145,7 +151,7 @@ export default class ThreejsClass {
         // }
       });
       mesh.rotation.y = Math.PI / 2;
-      mesh.position.set(40, 0, -50);
+      mesh.position.set(0, 0, 0);
       mesh.scale.set(1, 1, 1);
 
       this.city = mesh;

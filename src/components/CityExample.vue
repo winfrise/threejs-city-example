@@ -2,24 +2,42 @@
   <div id="container">
 
   </div>
+  <MeshTree  />
 </template>
 
 <script>
 import ThreejsClass from './ThreejsClass'
 import baseEventsPlugin from './plugins/baseEventsPlugin'
 import winResizePlugin from './plugins/winResizePlugin'
+import traverseMOdelPlugin from './plugins/traverseModelPlugin'
 ThreejsClass.use(baseEventsPlugin)
 ThreejsClass.use(winResizePlugin)
-export default {
+ThreejsClass.use(traverseMOdelPlugin)
+import MeshTree from './MeshTree.vue'
+import { defineComponent, onMounted, provide, ref} from 'vue';
+
+export default defineComponent({
   name: 'CityExample',
-  data () {
-    return {
-      cityModel:'/models/city.fbx',
-      ins: null
-    }
+  components: {
+    MeshTree
   },
-  mounted() {
-    this.ins = new ThreejsClass({cityModel: this.cityModel})
+  setup() {
+    const ins = ref()
+    provide('ins', ins)
+    onMounted(() => {
+      const cityIns = new ThreejsClass({cityModel: '/models/city.json'})
+      cityIns.on('traverseComplete', () => {
+        ins.value = cityIns
+      })
+    })
+
+    return {
+
+    }
   }
-}
+})
 </script>
+
+<style scoped>
+
+</style>
